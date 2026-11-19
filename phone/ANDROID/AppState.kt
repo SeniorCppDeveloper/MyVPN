@@ -2,8 +2,11 @@ package com.nullvpn.app
 
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.drawable.Drawable
 import android.net.Uri
 import android.net.VpnService
 import androidx.compose.runtime.getValue
@@ -29,9 +32,11 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sin
 
-enum class Screen { LOGIN, REGISTER, MAIN, SUB }
-enum class Hit { NONE, CONNECT, AVATAR, GO_SUB, DO_LOGOUT, LOGIN, SWITCH, BUY, BACK, PLAN0, PLAN1, PLAN2, ACTIVATE }
+enum class Screen { LOGIN, REGISTER, MAIN, SUB, APPS }
+enum class Hit { NONE, CONNECT, AVATAR, GO_SUB, DO_LOGOUT, LOGIN, SWITCH, BUY, BACK, PLAN0, PLAN1, PLAN2, ACTIVATE, APPS, APP_TOGGLE, APPS_MASTER, APPLY_SPLIT, SEARCH }
 enum class VState { OFF, CONNECTING, ON }
+
+class AppInfo(val label: String, val pkg: String, val icon: ImageBitmap?)
 
 class Plan(val months: Int, val days: Int, val price: Int, val code: String)
 
@@ -39,6 +44,7 @@ val PLANS = listOf(Plan(1, 30, 199, "1m"), Plan(3, 90, 499, "3m"), Plan(12, 365,
 const val BASE_PRICE = 199
 const val PERIOD_SEC = 30L * 86400L
 const val GB_F = 1073741824f
+const val APPS_ROW_H = 64f
 
 class Particle(var x: Float, var y: Float, val r: Float, val speed: Float, val phase: Float, val alpha: Float)
 
@@ -79,6 +85,7 @@ class Layout {
     var statusPill = ZR
     var stats = arrayOf(ZR, ZR, ZR)
     var graph = ZR
+    var appsBtn = ZR
     var subBtn = ZR
     var outBtn = ZR
     var header = ZR
@@ -92,6 +99,12 @@ class Layout {
     var activate = ZR
     var keyMsg = ZR
     var kbBottom = 0f
+    var appsMaster = ZR
+    var appsSearch = ZR
+    var appsListTop = 0f
+    var appsListBottom = 0f
+    var appsApply = ZR
+    var appsScrollBar = ZR
 
     fun compute(sc: Screen, hd: Float, ti: Float, bi: Float) {
         val top = ti + 12f
@@ -99,48 +112,60 @@ class Layout {
         val m = 16f
         when (sc) {
             Screen.LOGIN, Screen.REGISTER -> {
-                val ys = flow(top, bot, floatArrayOf(140f, 80f, 64f, 64f, 20f, 64f, 40f), 24f, 1000f)
+                val ys = flow(top, bot, floatArrayOf(140f, 80f, 72f, 72f, 20f, 76f, 52f), 22f, 1000f)
                 logo = Rc(W / 2f - 50f, ys[0], W / 2f + 50f, ys[0] + 110f)
                 titleBlock = Rc(m, ys[1], W - m, ys[1] + 70f)
-                fieldUser = Rc(m, ys[2], W - m, ys[2] + 64f)
-                fieldPass = Rc(m, ys[3], W - m, ys[3] + 64f)
+                fieldUser = Rc(m, ys[2], W - m, ys[2] + 72f)
+                fieldPass = Rc(m, ys[3], W - m, ys[3] + 72f)
                 errLine = Rc(m, ys[4], W - m, ys[4] + 20f)
-                loginBtn = Rc(m, ys[5], W - m, ys[5] + 64f)
-                switchBtn = Rc(m, ys[6], W - m, ys[6] + 40f)
-                kbBottom = ys[5] + 64f
+                loginBtn = Rc(m, ys[5], W - m, ys[5] + 76f)
+                switchBtn = Rc(m, ys[6], W - m, ys[6] + 52f)
+                kbBottom = ys[5] + 76f
             }
             Screen.MAIN -> {
-                val p = (bot - top) - (60f + 84f + 130f + 60f)
-                val r = ((p - 80f) / 2f).coerceIn(84f, 140f)
-                val ys = flow(top, bot, floatArrayOf(60f, 2f * r + 70f, 84f, 130f, 60f), 16f, 1000f)
-                topBar = Rc(m, ys[0], W - m, ys[0] + 60f)
-                avatarBtn = Rc(W - m - 44f, ys[0] + 8f, W - m, ys[0] + 52f)
+                val p = (bot - top) - (64f + 92f + 112f + 72f + 76f)
+                val r = ((p - 150f) / 2f).coerceIn(80f, 140f)
+                val ys = flow(top, bot, floatArrayOf(64f, 2f * r + 70f, 92f, 112f, 72f, 76f), 14f, 1000f)
+                topBar = Rc(m, ys[0], W - m, ys[0] + 64f)
+                avatarBtn = Rc(W - m - 56f, ys[0] + 4f, W - m, ys[0] + 60f)
                 pr = r
                 pcx = W / 2f
                 pcy = ys[1] + 10f + r
-                statusPill = Rc(W / 2f - 110f, pcy + r + 16f, W / 2f + 110f, pcy + r + 46f)
+                statusPill = Rc(W / 2f - 130f, pcy + r + 16f, W / 2f + 130f, pcy + r + 52f)
                 val w = (W - 2f * m - 20f) / 3f
-                stats = Array(3) { i -> Rc(m + i * (w + 10f), ys[2], m + i * (w + 10f) + w, ys[2] + 84f) }
-                graph = Rc(m, ys[3], W - m, ys[3] + 130f)
+                stats = Array(3) { i -> Rc(m + i * (w + 10f), ys[2], m + i * (w + 10f) + w, ys[2] + 92f) }
+                graph = Rc(m, ys[3], W - m, ys[3] + 112f)
+                appsBtn = Rc(m, ys[4], W - m, ys[4] + 72f)
                 val bw = (W - 2f * m - 12f) / 2f
-                subBtn = Rc(m, ys[4], m + bw, ys[4] + 60f)
-                outBtn = Rc(W - m - bw, ys[4], W - m, ys[4] + 60f)
+                subBtn = Rc(m, ys[5], m + bw, ys[5] + 76f)
+                outBtn = Rc(W - m - bw, ys[5], W - m, ys[5] + 76f)
                 kbBottom = 0f
             }
             Screen.SUB -> {
-                val ys = flow(top, bot, floatArrayOf(60f, 130f, 100f, 120f, 60f, 170f), 14f, 1000f)
-                header = Rc(m, ys[0], W - m, ys[0] + 60f)
-                back = Rc(m, ys[0] + 8f, m + 44f, ys[0] + 52f)
-                statusCard = Rc(m, ys[1], W - m, ys[1] + 130f)
-                trafficCard = Rc(m, ys[2], W - m, ys[2] + 100f)
+                val ys = flow(top, bot, floatArrayOf(64f, 120f, 96f, 124f, 76f, 190f), 14f, 1000f)
+                header = Rc(m, ys[0], W - m, ys[0] + 64f)
+                back = Rc(m, ys[0] + 4f, m + 56f, ys[0] + 60f)
+                statusCard = Rc(m, ys[1], W - m, ys[1] + 120f)
+                trafficCard = Rc(m, ys[2], W - m, ys[2] + 96f)
                 val w = (W - 2f * m - 20f) / 3f
-                plans = Array(3) { i -> Rc(m + i * (w + 10f), ys[3], m + i * (w + 10f) + w, ys[3] + 120f) }
-                buy = Rc(m, ys[4], W - m, ys[4] + 60f)
+                plans = Array(3) { i -> Rc(m + i * (w + 10f), ys[3], m + i * (w + 10f) + w, ys[3] + 124f) }
+                buy = Rc(m, ys[4], W - m, ys[4] + 76f)
                 keyLabel = Rc(m, ys[5], W - m, ys[5] + 14f)
-                keyField = Rc(m, ys[5] + 20f, W - m, ys[5] + 72f)
-                activate = Rc(m, ys[5] + 82f, W - m, ys[5] + 134f)
-                keyMsg = Rc(m, ys[5] + 138f, W - m, ys[5] + 156f)
-                kbBottom = ys[5] + 134f
+                keyField = Rc(m, ys[5] + 20f, W - m, ys[5] + 84f)
+                activate = Rc(m, ys[5] + 94f, W - m, ys[5] + 158f)
+                keyMsg = Rc(m, ys[5] + 164f, W - m, ys[5] + 182f)
+                kbBottom = ys[5] + 158f
+            }
+            Screen.APPS -> {
+                header = Rc(m, top, W - m, top + 64f)
+                back = Rc(m, top + 4f, m + 56f, top + 60f)
+                appsMaster = Rc(m, top + 78f, W - m, top + 150f)
+                appsSearch = Rc(m, top + 162f, W - m, top + 218f)
+                appsApply = Rc(m, bot - 60f, W - m, bot)
+                appsListTop = top + 230f
+                appsListBottom = bot - 70f
+                appsScrollBar = Rc(W - 12f, appsListTop, W - 6f, appsListBottom)
+                kbBottom = top + 218f
             }
         }
     }
@@ -173,9 +198,21 @@ class AppState(val ctx: Context) {
     var inputKey by mutableStateOf("")
     var loginError by mutableStateOf("")
 
+    var splitEnabled by mutableStateOf(false)
+    var splitSel by mutableStateOf<Set<String>>(emptySet())
+    var appliedSig by mutableStateOf("")
+    var installed by mutableStateOf<List<AppInfo>>(emptyList())
+    var appsLoading by mutableStateOf(false)
+    var appsScroll by mutableStateOf(0f)
+    var hitAppPkg: String? = null
+    var reconnectHint by mutableStateOf(false)
+    var searchQuery by mutableStateOf("")
+    var searchFocus by mutableStateOf(false)
+    var appsFiltered: List<AppInfo> = emptyList()
+
     var acc: Account? = null
     var avatar: ImageBitmap? = null
-    var vstate = VState.OFF
+    var vstate by mutableStateOf(VState.OFF)
     var busy = false
     var authBusy = false
     var hit = Hit.NONE
@@ -186,7 +223,7 @@ class AppState(val ctx: Context) {
     var press = 0f
     var conn = 0f
     val planSel = floatArrayOf(0f, 1f, 0f)
-    val focus = floatArrayOf(0f, 0f, 0f)
+    val focus = floatArrayOf(0f, 0f, 0f, 0f)
     var fUser = false
     var fPass = false
     var fKey = false
@@ -239,6 +276,9 @@ class AppState(val ctx: Context) {
                 )
             )
         }
+        val sp = store.loadSplit()
+        splitEnabled = sp.first
+        splitSel = sp.second
         if (token.isNotEmpty()) restoreSession()
     }
 
@@ -278,6 +318,23 @@ class AppState(val ctx: Context) {
         areaH = h / s
     }
 
+    fun isAppEnabled(pkg: String): Boolean = !splitEnabled || pkg in splitSel
+
+    fun splitSummary(): String = if (!splitEnabled) "VPN для всех приложений" else "Только выбранные: " + splitSel.size
+
+    fun filteredApps(): List<AppInfo> {
+        if (searchQuery.isEmpty()) return installed
+        val q = searchQuery.lowercase()
+        return installed.filter { it.label.lowercase().contains(q) || it.pkg.lowercase().contains(q) }
+    }
+
+    fun maxScroll(): Float {
+        val rows = ((L.appsListBottom - L.appsListTop) / APPS_ROW_H).toInt()
+        val n = filteredApps().size
+        val maxRows = (n - rows).coerceAtLeast(0)
+        return maxRows * APPS_ROW_H
+    }
+
     fun hitTest(p: Offset): Hit {
         val x = (p.x - ox) / s
         val y = (p.y - oy) / s
@@ -291,6 +348,7 @@ class AppState(val ctx: Context) {
                 val dy = y - L.pcy
                 if (dx * dx + dy * dy <= (L.pr + 6f) * (L.pr + 6f)) return Hit.CONNECT
                 if (L.avatarBtn.has(x, y)) return Hit.AVATAR
+                if (L.appsBtn.has(x, y)) return Hit.APPS
                 if (L.subBtn.has(x, y)) return Hit.GO_SUB
                 if (L.outBtn.has(x, y)) return Hit.DO_LOGOUT
             }
@@ -299,6 +357,22 @@ class AppState(val ctx: Context) {
                 if (L.buy.has(x, y)) return Hit.BUY
                 if (L.activate.has(x, y)) return Hit.ACTIVATE
                 for (i in 0..2) if (L.plans[i].has(x, y)) return Hit.values()[Hit.PLAN0.ordinal + i]
+            }
+            Screen.APPS -> {
+                if (L.back.has(x, y)) return Hit.BACK
+                if (L.appsMaster.has(x, y)) return Hit.APPS_MASTER
+                if (L.appsSearch.has(x, y)) return Hit.SEARCH
+                if (splitEnabled) {
+                    if (L.appsApply.has(x, y)) return Hit.APPLY_SPLIT
+                    if (y in L.appsListTop..L.appsListBottom) {
+                        val idx = ((y - L.appsListTop + appsScroll) / APPS_ROW_H).toInt()
+                        val list = filteredApps()
+                        if (idx in list.indices) {
+                            hitAppPkg = list[idx].pkg
+                            return Hit.APP_TOGGLE
+                        }
+                    }
+                }
             }
         }
         return Hit.NONE
@@ -312,12 +386,18 @@ class AppState(val ctx: Context) {
                 keyMsg = ""
                 keyMsgT = 0f
             }
+            if (sc == Screen.APPS) {
+                appsScroll = 0f
+                searchQuery = ""
+                searchFocus = false
+            }
         }
     }
 
     fun activate(h: Hit) {
         when (h) {
             Hit.GO_SUB -> goTo(Screen.SUB)
+            Hit.APPS -> openApps()
             Hit.DO_LOGOUT -> {
                 val now = System.currentTimeMillis()
                 if (now < logoutArmedUntil) {
@@ -338,13 +418,28 @@ class AppState(val ctx: Context) {
                 loginError = ""
             }
             Hit.BUY -> openBuy()
-            Hit.BACK -> goTo(Screen.MAIN)
+            Hit.BACK -> { goTo(Screen.MAIN); appsScroll = 0f }
             Hit.PLAN0 -> selPlan = 0
             Hit.PLAN1 -> selPlan = 1
             Hit.PLAN2 -> selPlan = 2
             Hit.ACTIVATE -> redeemKey()
+            Hit.APP_TOGGLE -> hitAppPkg?.let { toggleAppEnabled(it) }
+            Hit.APPS_MASTER -> {
+                splitEnabled = !splitEnabled
+                if (!splitEnabled) appsScroll = 0f
+                store.saveSplit(splitEnabled, splitSel)
+                if (splitDirty()) reconnectHint = true
+            }
+            Hit.APPLY_SPLIT -> { reconnectHint = false; reconnectNow() }
+            Hit.SEARCH -> searchFocus = true
             else -> {}
         }
+    }
+
+    fun toggleAppEnabled(pkg: String) {
+        splitSel = if (pkg in splitSel) splitSel - pkg else splitSel + pkg
+        store.saveSplit(splitEnabled, splitSel)
+        if (splitDirty()) reconnectHint = true
     }
 
     fun update(dt: Float) {
@@ -360,6 +455,7 @@ class AppState(val ctx: Context) {
         focus[0] = ap(focus[0], if (auth && fUser) 1f else 0f, 12f, dt)
         focus[1] = ap(focus[1], if (auth && fPass) 1f else 0f, 12f, dt)
         focus[2] = ap(focus[2], if (screen == Screen.SUB && fKey) 1f else 0f, 12f, dt)
+        focus[3] = ap(focus[3], if (screen == Screen.APPS && searchFocus) 1f else 0f, 12f, dt)
         priceShown = ap(priceShown, PLANS[selPlan].price.toFloat(), 9f, dt)
         shake = max(0f, shake - dt * 2.2f)
         keyShake = max(0f, keyShake - dt * 2.2f)
@@ -369,6 +465,9 @@ class AppState(val ctx: Context) {
             rip += dt * 1.5f
             if (rip >= 1f) rip = 0f
         }
+        val ms = maxScroll()
+        if (appsScroll > ms) appsScroll = ms
+        if (appsScroll < 0f) appsScroll = 0f
 
         val target = if (imeBottom > 0f && L.kbBottom > 0f) max(0f, (L.kbBottom + 14f) * s - (screenH - imeBottom)) else 0f
         shift = ap(shift, target, 12f, dt)
@@ -600,6 +699,10 @@ class AppState(val ctx: Context) {
                 goTo(Screen.SUB)
                 return
             }
+            if (splitEnabled && splitSel.isEmpty()) {
+                showError("Выберите приложения для VPN")
+                return
+            }
             val i = try {
                 VpnService.prepare(ctx)
             } catch (e: Exception) {
@@ -620,6 +723,9 @@ class AppState(val ctx: Context) {
         busy = true
         errMsg = null
         vstate = VState.CONNECTING
+        val useSplit = splitEnabled
+        val spSel = splitSel
+        appliedSig = sigOf(useSplit, spSel)
         scope.launch {
             val err = withContext(Dispatchers.IO) {
                 var msg: String? = null
@@ -629,7 +735,7 @@ class AppState(val ctx: Context) {
                     msg = c.error ?: "Нет связи с сервером"
                 } else {
                     try {
-                        vpn.up(j.optString("config"))
+                        vpn.up(applySplit(j.optString("config"), useSplit, spSel))
                     } catch (ex: Exception) {
                         msg = "Туннель: " + (ex.message ?: ex.javaClass.simpleName).take(60)
                     }
@@ -714,6 +820,99 @@ class AppState(val ctx: Context) {
             lastRx = rx
             lastTx = tx
             haveBase = true
+        }
+    }
+
+    private fun sigOf(useSplit: Boolean, sel: Set<String>): String =
+        if (!useSplit) "ALL" else "ONLY:" + sel.sorted().joinToString(",")
+
+    fun splitDirty(): Boolean = vstate == VState.ON && sigOf(splitEnabled, splitSel) != appliedSig
+
+    private fun applySplit(cfg: String, useSplit: Boolean, sel: Set<String>): String {
+        if (!useSplit) return cfg
+        if (sel.isEmpty()) return cfg
+        val pkgs = sel + ctx.packageName
+        val lines = cfg.lines().filterNot {
+            val k = it.substringBefore("=").trim().lowercase()
+            k == "includedapplications" || k == "excludedapplications"
+        }.toMutableList()
+        val idx = lines.indexOfFirst { it.trim().equals("[Interface]", ignoreCase = true) }
+        if (idx < 0) return cfg
+        lines.add(idx + 1, "IncludedApplications = " + pkgs.sorted().joinToString(", "))
+        return lines.joinToString("\n")
+    }
+
+    fun openApps() {
+        goTo(Screen.APPS)
+        if (installed.isEmpty() && !appsLoading) loadInstalled()
+    }
+
+    private fun loadInstalled() {
+        appsLoading = true
+        scope.launch {
+            val list = withContext(Dispatchers.IO) { queryApps() }
+            installed = list
+            appsLoading = false
+        }
+    }
+
+    private fun queryApps(): List<AppInfo> {
+        val pm = ctx.packageManager
+        val launcher = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+        val resolved = try {
+            pm.queryIntentActivities(launcher, 0)
+        } catch (e: Exception) {
+            emptyList()
+        }
+        val pkgs = LinkedHashSet<String>()
+        for (r in resolved) pkgs.add(r.activityInfo.packageName)
+        try {
+            for (app in pm.getInstalledApplications(PackageManager.GET_META_DATA)) {
+                if (pm.getLaunchIntentForPackage(app.packageName) != null) pkgs.add(app.packageName)
+            }
+        } catch (e: Exception) {
+        }
+        val out = ArrayList<AppInfo>()
+        for (pkg in pkgs) {
+            if (pkg == ctx.packageName) continue
+            val label = try {
+                pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString()
+            } catch (e: Exception) {
+                pkg
+            }
+            val icon = try {
+                iconBitmap(pm.getApplicationIcon(pkg), 96)
+            } catch (e: Exception) {
+                null
+            }
+            out.add(AppInfo(label, pkg, icon))
+        }
+        out.sortBy { it.label.lowercase() }
+        return out
+    }
+
+    private fun iconBitmap(d: Drawable, size: Int): ImageBitmap {
+        val bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        d.setBounds(0, 0, size, size)
+        d.draw(Canvas(bmp))
+        return bmp.asImageBitmap()
+    }
+
+    fun reconnectNow() {
+        if (busy || vstate != VState.ON) return
+        sampler?.cancel()
+        sampler = null
+        busy = true
+        vstate = VState.CONNECTING
+        scope.launch {
+            withContext(Dispatchers.IO) {
+                try {
+                    vpn.down()
+                } catch (e: Exception) {
+                }
+            }
+            busy = false
+            startConnect()
         }
     }
 
