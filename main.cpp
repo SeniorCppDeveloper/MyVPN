@@ -197,7 +197,7 @@ static std::wstring ToHex(const BYTE* d, size_t n) {
 static std::wstring DataPath(const wchar_t* name) { return ExeDir() + L"\\" + name; }
 
 // ===================== сервер: API, токен, устройство =====================
-static const wchar_t* API_HOST = L"109.120.147.7";
+static const wchar_t* API_HOST = L"82.148.250.26";
 static const char* API_PIN = "81febbdfd68746198029a1633b5d6b45692f5658da439f5d88a4ded34e87db3f";
 
 static std::string g_token;
@@ -2355,6 +2355,19 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     return 0;
 }
 
+static bool IsElevated() {
+    BOOL elevated = FALSE;
+    HANDLE tok = nullptr;
+    if (OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &tok)) {
+        TOKEN_ELEVATION te;
+        DWORD sz = sizeof(te);
+        if (GetTokenInformation(tok, TokenElevation, &te, sizeof(te), &sz))
+            elevated = te.TokenIsElevated;
+        CloseHandle(tok);
+    }
+    return elevated != FALSE;
+}
+
 int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR, int nCmdShow) {
     int argc = 0;
     LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &argc);
@@ -2368,6 +2381,13 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR, int nCmdShow) {
         return 1;
     }
     if (argv) LocalFree(argv);
+    
+    if (!IsElevated()) {
+        wchar_t exe[MAX_PATH];
+        GetModuleFileNameW(nullptr, exe, MAX_PATH);
+        ShellExecuteW(nullptr, L"runas", exe, nullptr, nullptr, nCmdShow);
+        return 0;
+    }
 
     SetProcessDPIAware();
     std::srand((unsigned)std::time(nullptr));
