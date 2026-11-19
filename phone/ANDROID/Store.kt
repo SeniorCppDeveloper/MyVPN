@@ -4,6 +4,8 @@ import android.content.Context
 import java.io.File
 import java.util.UUID
 
+enum class SplitMode { ALL, ONLY, EXCEPT }
+
 data class Account(
     var user: String,
     var subExpire: Long,
@@ -29,6 +31,26 @@ class Store(private val ctx: Context) {
         val id = "android-" + UUID.randomUUID().toString().replace("-", "").take(12)
         file.writeText(id)
         return id
+    }
+
+    fun loadSplit(): Pair<Boolean, Set<String>> {
+        val file = f("split.dat")
+        if (!file.exists()) return Pair(false, emptySet())
+        val lines = try {
+            file.readLines().map { it.trim() }.filter { it.isNotEmpty() }
+        } catch (e: Exception) {
+            emptyList()
+        }
+        if (lines.isEmpty()) return Pair(false, emptySet())
+        val enabled = lines[0].equals("ON", ignoreCase = true)
+        return Pair(enabled, lines.drop(1).toSet())
+    }
+
+    fun saveSplit(enabled: Boolean, apps: Set<String>) {
+        try {
+            f("split.dat").writeText((listOf(if (enabled) "ON" else "OFF") + apps.sorted()).joinToString("\n"))
+        } catch (e: Exception) {
+        }
     }
 
     fun avatarFile(user: String): File =
