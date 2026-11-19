@@ -2,6 +2,7 @@ package com.nullvpn.app
 
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -35,6 +36,7 @@ fun DrawScope.paintAll(a: AppState) {
             Screen.LOGIN, Screen.REGISTER -> paintAuth(a)
             Screen.MAIN -> paintMain(a)
             Screen.SUB -> paintSub(a)
+            Screen.APPS -> paintApps(a)
         }
     }
 }
@@ -50,6 +52,7 @@ fun DrawScope.paintGlows(a: AppState) {
             if (conn > 0.02f) blob(L.pcx - drift, L.pcy, 170f, 170f, A((40f * conn).toInt(), 170, 90, 255))
         }
         Screen.SUB -> blob(W / 2f - drift, L.statusCard.t + 40f, 260f, 150f, if (a.isPremium()) A(40, 225, 160, 255) else A(24, 150, 90, 255))
+        Screen.APPS -> blob(W / 2f - drift, 110f, 260f, 170f, A(30, 130, 60, 230))
         else -> blob(W / 2f + drift, L.logo.t + 40f, 260f, 200f, A(34, 130, 60, 230))
     }
     blob(W / 2f, a.areaH - 40f, 240f, 120f, A(22, 100, 50, 200))
@@ -81,20 +84,23 @@ fun DrawScope.gradButton(rc: Rc, r: Float, hv: Float, pressed: Boolean, ready: B
 
 fun DrawScope.fieldBox(r: Rc, f: Float, isErr: Boolean, shakeX: Float, icon: Int, placeholder: String, empty: Boolean) {
     withTransform({ translate(shakeX, 0f) }) {
-        if (f > 0.02f) for (i in 2 downTo 1) rrS(r.l, r.t, r.w, r.h, 16f, A((f * 26f / i).toInt(), 160, 90, 255), 2f + i * 3f)
-        rr(r.l, r.t, r.w, r.h, 16f, mix(A(255, 17, 12, 30), A(255, 24, 16, 44), f))
+        val rad = 20f
+        if (f > 0.02f) for (i in 2 downTo 1) rrS(r.l, r.t, r.w, r.h, rad, A((f * 26f / i).toInt(), 160, 90, 255), 2f + i * 3f)
+        rr(r.l, r.t, r.w, r.h, rad, mix(A(255, 17, 12, 30), A(255, 24, 16, 44), f))
         rrS(
-            r.l, r.t, r.w, r.h, 16f,
+            r.l, r.t, r.w, r.h, rad,
             if (isErr) A(255, 235, 80, 120) else mix(A(255, 56, 42, 92), A(255, 150, 80, 235), f),
-            1f + 0.6f * f
+            1.2f + 0.8f * f
         )
         val icc = mix(A(255, 110, 88, 160), A(255, 190, 130, 255), f)
-        when (icon) {
-            0 -> iconUser(r.l + 26f, r.t + r.h / 2f, icc)
-            1 -> iconLock(r.l + 26f, r.t + r.h / 2f, icc)
-            else -> iconKey(r.l + 26f, r.t + r.h / 2f, icc)
+        scaled(r.l + 30f, r.t + r.h / 2f, 1.3f) {
+            when (icon) {
+                0 -> iconUser(0f, 0f, icc)
+                1 -> iconLock(0f, 0f, icc)
+                else -> iconKey(0f, 0f, icc)
+            }
         }
-        if (empty) txt(placeholder, r.l + 50f + 4f * f, r.t, r.w - 50f, r.h, 16f, A(255, 100, 80, 140), 0, false)
+        if (empty) txt(placeholder, r.l + FIELD_PAD + 4f * f, r.t, r.w - FIELD_PAD, r.h, 18f, A(255, 100, 80, 140), 0, false)
     }
 }
 
@@ -118,10 +124,10 @@ fun DrawScope.paintAuth(a: AppState) {
 
     reveal(a, 1, L.titleBlock.l, L.titleBlock.t, L.titleBlock.w, L.titleBlock.h) {
         val b = L.titleBlock
-        txt(if (isReg) "СОЗДАТЬ АККАУНТ" else "ВХОД В АККАУНТ", b.l, b.t, b.w, 40f, 26f, WHITE)
+        txt(if (isReg) "СОЗДАТЬ АККАУНТ" else "ВХОД В АККАУНТ", b.l, b.t, b.w, 40f, 28f, WHITE)
         txt(
             if (isReg) "Логин от 3 символов, пароль от 6" else "Войдите, чтобы подключиться",
-            b.l, b.t + 42f, b.w, 24f, 14f, A(255, 130, 108, 175), 1, false
+            b.l, b.t + 42f, b.w, 24f, 15f, A(255, 130, 108, 175), 1, false
         )
     }
 
@@ -131,11 +137,11 @@ fun DrawScope.paintAuth(a: AppState) {
     reveal(a, 3, L.fieldPass.l, L.fieldPass.t, L.fieldPass.w, L.fieldPass.h) { fieldBox(L.fieldPass, a.focus[1], err, shakeX, 1, "Пароль", a.inputPass.isEmpty()) }
 
     reveal(a, 4, L.errLine.l, L.errLine.t, L.loginBtn.r - L.errLine.l, L.loginBtn.b - L.errLine.t) {
-        if (a.loginError.isNotEmpty()) txt(a.loginError, L.errLine.l, L.errLine.t, L.errLine.w, L.errLine.h, 12f, A(255, 255, 110, 130))
+        if (a.loginError.isNotEmpty()) txt(a.loginError, L.errLine.l, L.errLine.t, L.errLine.w, L.errLine.h, 13f, A(255, 255, 110, 130))
         val ready = a.inputUser.isNotEmpty() && a.inputPass.isNotEmpty()
         gradButton(
-            L.loginBtn, 18f, a.hvOf(Hit.LOGIN), a.down == Hit.LOGIN && a.hit == Hit.LOGIN, ready,
-            if (isReg) "ЗАРЕГИСТРИРОВАТЬСЯ" else "ВОЙТИ", 17f, t
+            L.loginBtn, 24f, a.hvOf(Hit.LOGIN), a.down == Hit.LOGIN && a.hit == Hit.LOGIN, ready,
+            if (isReg) "ЗАРЕГИСТРИРОВАТЬСЯ" else "ВОЙТИ", 19f, t
         )
     }
 
@@ -143,7 +149,7 @@ fun DrawScope.paintAuth(a: AppState) {
         val b = L.switchBtn
         txt(
             if (isReg) "Уже есть аккаунт? Войти" else "Нет аккаунта? Создать",
-            b.l, b.t, b.w, b.h, 15f, mix(A(255, 160, 130, 215), WHITE, a.hvOf(Hit.SWITCH)), 1, false
+            b.l, b.t, b.w, b.h, 17f, mix(A(255, 160, 130, 215), WHITE, a.hvOf(Hit.SWITCH)), 1, false
         )
     }
 }
@@ -152,15 +158,15 @@ fun fmtSpeed(bps: Float): Pair<String, String> =
     if (bps >= 1048576f) Pair(String.format("%.1f", bps / 1048576f), "МБ/с") else Pair(String.format("%.0f", bps / 1024f), "КБ/с")
 
 fun DrawScope.statCard(rc: Rc, label: String, value: String, unit: String, valueColor: Color, arrow: Int) {
-    card(rc.l, rc.t, rc.w, rc.h, 16f, A(255, 20, 14, 36), A(255, 9, 7, 16), A(255, 52, 38, 84))
-    var lx = rc.l + 12f
+    card(rc.l, rc.t, rc.w, rc.h, 18f, A(255, 20, 14, 36), A(255, 9, 7, 16), A(255, 52, 38, 84))
+    var lx = rc.l + 14f
     if (arrow >= 0) {
-        iconArrow(rc.l + 17f, rc.t + 17f, arrow == 1, if (arrow == 1) A(255, 200, 140, 255) else A(255, 120, 230, 160))
-        lx = rc.l + 28f
+        iconArrow(rc.l + 19f, rc.t + 19f, arrow == 1, if (arrow == 1) A(255, 200, 140, 255) else A(255, 120, 230, 160))
+        lx = rc.l + 32f
     }
-    txt(label, lx, rc.t + 8f, rc.w - 16f, 18f, 10f, A(255, 150, 120, 200), 0)
-    txt(value, rc.l, rc.t + 28f, rc.w, 28f, 22f, valueColor)
-    txt(unit, rc.l, rc.t + 56f, rc.w, 14f, 10f, A(255, 130, 108, 175), 1, false)
+    txt(label, lx, rc.t + 10f, rc.w - 18f, 18f, 11f, A(255, 150, 120, 200), 0)
+    txt(value, rc.l, rc.t + 32f, rc.w, 30f, 25f, valueColor)
+    txt(unit, rc.l, rc.t + 65f, rc.w, 16f, 11f, A(255, 130, 108, 175), 1, false)
 }
 
 fun DrawScope.paintMain(a: AppState) {
@@ -173,28 +179,28 @@ fun DrawScope.paintMain(a: AppState) {
 
     reveal(a, 0, L.topBar.l, L.topBar.t, L.topBar.w, L.topBar.h) {
         val tb = L.topBar
-        drawLogo(tb.l, tb.t + 16f, 28f)
-        txt("NULL VPN", tb.l + 36f, tb.t, 110f, tb.h, 16f, A(255, 215, 190, 255), 0)
+        drawLogo(tb.l, tb.t + 15f, 34f)
+        txt("NULL VPN", tb.l + 44f, tb.t, 120f, tb.h, 18f, A(255, 215, 190, 255), 0)
         val ab = L.avatarBtn
         val acx = (ab.l + ab.r) / 2f
         val acy = (ab.t + ab.b) / 2f
         val hv = a.hvOf(Hit.AVATAR)
         if (a.avatar != null) {
-            avatarDisc(a, acx, acy, 20f)
+            avatarDisc(a, acx, acy, 24f)
         } else {
-            drawCircle(dGrad(A(255, 190, 120, 255), A(255, 100, 45, 205), acx - 20f, acy - 20f, 40f, 40f), 20f, Offset(acx, acy))
-            txt((acc?.user?.take(1) ?: "?").uppercase(), acx - 20f, acy - 20f, 40f, 40f, 17f, WHITE)
+            drawCircle(dGrad(A(255, 190, 120, 255), A(255, 100, 45, 205), acx - 24f, acy - 24f, 48f, 48f), 24f, Offset(acx, acy))
+            txt((acc?.user?.take(1) ?: "?").uppercase(), acx - 24f, acy - 24f, 48f, 48f, 20f, WHITE)
         }
         drawCircle(
             if (prem) A(255, 235, 190, 255) else mix(A(255, 90, 68, 140), A(255, 190, 130, 255), hv),
-            22f, Offset(acx, acy), style = Stroke(2f)
+            27f, Offset(acx, acy), style = Stroke(2.4f)
         )
-        val nx = tb.l + 150f
+        val nx = tb.l + 170f
         val nw = ab.l - 10f - nx
-        txt(ell(acc?.user ?: "", 15f, nw), nx, tb.t + 10f, nw, 22f, 15f, WHITE, 2)
+        txt(ell(acc?.user ?: "", 16f, nw), nx, tb.t + 10f, nw, 22f, 16f, WHITE, 2)
         txt(
             if (prem) "PREMIUM • " + a.daysLeftSub() + " дн." else "Нет подписки",
-            nx, tb.t + 32f, nw, 18f, 11f, if (prem) A(255, 235, 190, 255) else A(255, 150, 120, 200), 2
+            nx, tb.t + 34f, nw, 18f, 12f, if (prem) A(255, 235, 190, 255) else A(255, 150, 120, 200), 2
         )
     }
 
@@ -257,15 +263,15 @@ fun DrawScope.paintMain(a: AppState) {
 
         val ty = cy + r * 0.52f
         if (!prem && a.vstate == VState.OFF) {
-            txt("ОФОРМИТЬ", cx - r, ty - 8f, r * 2f, 16f, 12f, WHITE)
-            txt("ПОДПИСКУ", cx - r, ty + 8f, r * 2f, 16f, 12f, WHITE)
+            txt("ОФОРМИТЬ", cx - r, ty - 10f, r * 2f, 18f, 14f, WHITE)
+            txt("ПОДПИСКУ", cx - r, ty + 9f, r * 2f, 18f, 14f, WHITE)
         } else if (a.vstate == VState.ON) {
             val s = ((now - a.connectedAt) / 1000L).toInt()
-            txt(String.format("%02d:%02d:%02d", s / 3600, (s / 60) % 60, s % 60), cx - r, ty - 10f, r * 2f, 24f, 20f, WHITE)
+            txt(String.format("%02d:%02d:%02d", s / 3600, (s / 60) % 60, s % 60), cx - r, ty - 11f, r * 2f, 26f, 22f, WHITE)
         } else if (a.vstate == VState.CONNECTING) {
-            txt("ПОДКЛЮЧЕНИЕ" + ".".repeat(((t * 3f).toInt()) % 4), cx - r, ty - 8f, r * 2f, 16f, 13f, WHITE)
+            txt("ПОДКЛЮЧЕНИЕ" + ".".repeat(((t * 3f).toInt()) % 4), cx - r, ty - 9f, r * 2f, 18f, 15f, WHITE)
         } else {
-            txt("ПОДКЛЮЧИТЬ", cx - r, ty - 8f, r * 2f, 16f, 14f, WHITE)
+            txt("ПОДКЛЮЧИТЬ", cx - r, ty - 9f, r * 2f, 18f, 17f, WHITE)
         }
     }
 
@@ -285,8 +291,8 @@ fun DrawScope.paintMain(a: AppState) {
     }
     reveal(a, 2, L.statusPill.l, L.statusPill.t, L.statusPill.w, L.statusPill.h) {
         val sp = L.statusPill
-        val shown = ell(st, 14f, sp.w - 50f)
-        val pw = min(sp.w, textW(shown, 14f) + 44f)
+        val shown = ell(st, 15f, sp.w - 60f)
+        val pw = min(sp.w, textW(shown, 15f) + 54f)
         val px = (W - pw) / 2f
         rr(px, sp.t, pw, sp.h, sp.h / 2f, tc.copy(alpha = 0.13f))
         rrS(px, sp.t, pw, sp.h, sp.h / 2f, tc.copy(alpha = 0.35f))
@@ -295,8 +301,8 @@ fun DrawScope.paintMain(a: AppState) {
             VState.ON -> 0.75f + 0.25f * sin(t * 2.5f)
             else -> 1f
         }
-        drawCircle(tc.copy(alpha = dotA), 3.5f, Offset(px + 16f, sp.t + sp.h / 2f))
-        txt(shown, px + 22f, sp.t, pw - 22f, sp.h, 14f, tc)
+        drawCircle(tc.copy(alpha = dotA), 4.5f, Offset(px + 20f, sp.t + sp.h / 2f))
+        txt(shown, px + 30f, sp.t, pw - 30f, sp.h, 15f, tc)
     }
 
     reveal(a, 3, L.stats[0].l, L.stats[0].t, L.stats[2].r - L.stats[0].l, L.stats[0].h) {
@@ -316,11 +322,11 @@ fun DrawScope.paintMain(a: AppState) {
     reveal(a, 4, L.graph.l, L.graph.t, L.graph.w, L.graph.h) {
         val g = L.graph
         card(g.l, g.t, g.w, g.h, 18f, A(255, 20, 14, 36), A(255, 9, 7, 16), A(255, 52, 38, 84))
-        txt("ЗАДЕРЖКА", g.l + 14f, g.t + 8f, 120f, 18f, 10f, A(255, 150, 120, 200), 0)
+        txt("ЗАДЕРЖКА", g.l + 14f, g.t + 8f, 120f, 18f, 11f, A(255, 150, 120, 200), 0)
         val gl = g.l + 14f
         val gr = g.r - 14f
-        val gt = g.t + 40f
-        val gb = g.b - 16f
+        val gt = g.t + 38f
+        val gb = g.b - 14f
         for (i in 0 until 3) {
             val y = gt + (gb - gt) * i / 2f
             drawLine(A(255, 24, 16, 38), Offset(gl, y), Offset(gr, y), 1f)
@@ -343,13 +349,45 @@ fun DrawScope.paintMain(a: AppState) {
             drawCircle(A(60, 200, 130, 255), pr + 3f, last)
             drawCircle(WHITE, 3f, last)
         } else {
-            txt("Подключитесь, чтобы увидеть график", g.l, gt, g.w, gb - gt, 12f, A(255, 100, 80, 140), 1, false)
+            txt("Подключитесь, чтобы увидеть график", g.l, gt, g.w, gb - gt, 13f, A(255, 100, 80, 140), 1, false)
         }
     }
 
-    reveal(a, 5, L.subBtn.l, L.subBtn.t, L.outBtn.r - L.subBtn.l, L.subBtn.h) {
-        gradButton(L.subBtn, 20f, a.hvOf(Hit.GO_SUB), a.down == Hit.GO_SUB && a.hit == Hit.GO_SUB, true, "Подписка", 17f, t)
-        iconCrown(L.subBtn.l + 30f, L.subBtn.t + L.subBtn.h / 2f, WHITE)
+    reveal(a, 5, L.appsBtn.l, L.appsBtn.t, L.appsBtn.w, L.appsBtn.h) {
+        val b = L.appsBtn
+        val hv = a.hvOf(Hit.APPS)
+        val pr = if (a.down == Hit.APPS && a.hit == Hit.APPS) 1f else 0f
+        val x = b.l + pr * 2f
+        val y = b.t + pr * 1.5f
+        val w = b.w - pr * 4f
+        val h = b.h - pr * 3f
+        val active = a.splitEnabled && a.splitSel.isNotEmpty()
+        glowRR(x, y, w, h, 24f, A(255, 180, 110, 255), hv * 0.7f + (if (active) 0.25f else 0f))
+        card(
+            x, y, w, h, 24f,
+            mix(A(255, 24, 17, 44), A(255, 42, 28, 76), hv),
+            mix(A(255, 11, 8, 20), A(255, 22, 14, 42), hv),
+            mix(if (active) A(255, 150, 100, 230) else A(255, 62, 46, 102), A(255, 195, 125, 255), hv),
+            if (active) 1.6f else 1.2f
+        )
+        val bs = 48f
+        val bx = x + 14f
+        val by = y + (h - bs) / 2f
+        val ba = if (active) 255 else 160
+        rrB(bx, by, bs, bs, 16f, dGrad(A(ba, 118, 52, 214), A(ba, 172, 80, 248), bx, by, bs, bs))
+        scaled(bx + bs / 2f, by + bs / 2f, 1.25f) { iconApps(0f, 0f, WHITE) }
+        val tw = w - 128f
+        txt("Приложения", x + 76f, y + 11f, tw, 26f, 18f, WHITE, 0)
+        txt(
+            ell(a.splitSummary(), 13f, tw), x + 76f, y + 38f, tw, 22f, 13f,
+            if (active) A(255, 235, 190, 255) else A(255, 130, 108, 175), 0, false
+        )
+        scaled(x + w - 26f, y + h / 2f, 1.1f) { iconChevron(0f, 0f, mix(A(255, 130, 108, 175), WHITE, hv)) }
+    }
+
+    reveal(a, 6, L.subBtn.l, L.subBtn.t, L.outBtn.r - L.subBtn.l, L.subBtn.h) {
+        gradButton(L.subBtn, 26f, a.hvOf(Hit.GO_SUB), a.down == Hit.GO_SUB && a.hit == Hit.GO_SUB, true, "Подписка", 20f, t)
+        scaled(L.subBtn.l + 38f, L.subBtn.t + L.subBtn.h / 2f, 1.4f) { iconCrown(0f, 0f, WHITE) }
 
         val o = L.outBtn
         val armed = now < a.logoutArmedUntil
@@ -360,10 +398,10 @@ fun DrawScope.paintMain(a: AppState) {
         val ow = o.w - pr * 4f
         val oh = o.h - pr * 3f
         val base = if (armed) A(255, 235, 60, 110) else mix(A(255, 255, 125, 150), A(255, 255, 160, 180), hv)
-        rr(ox, oy, ow, oh, 20f, base.copy(alpha = if (armed) 0.28f else 0.10f + 0.10f * hv))
-        rrS(ox, oy, ow, oh, 20f, base.copy(alpha = 0.8f), 1.6f)
-        iconLogout(ox + 30f, oy + oh / 2f, base)
-        txt(if (armed) "Нажмите ещё раз" else "Выйти", ox + 44f, oy, ow - 44f, oh, if (armed) 14f else 17f, base)
+        rr(ox, oy, ow, oh, 26f, base.copy(alpha = if (armed) 0.28f else 0.10f + 0.10f * hv))
+        rrS(ox, oy, ow, oh, 26f, base.copy(alpha = 0.8f), 1.8f)
+        scaled(ox + 38f, oy + oh / 2f, 1.3f) { iconLogout(0f, 0f, base) }
+        txt(if (armed) "Нажмите ещё раз" else "Выйти", ox + 58f, oy, ow - 58f, oh, if (armed) 15f else 20f, base)
     }
 }
 
@@ -376,12 +414,12 @@ fun DrawScope.paintSub(a: AppState) {
     reveal(a, 0, L.header.l, L.header.t, L.header.w, L.header.h) {
         val b = L.back
         val hv = a.hvOf(Hit.BACK)
-        drawCircle(A((40f * hv).toInt(), 190, 140, 255), 22f, Offset(b.l + 22f, b.t + 22f))
-        drawCircle(mix(A(255, 80, 58, 130), A(255, 190, 130, 255), hv), 22f, Offset(b.l + 22f, b.t + 22f), style = Stroke(1.2f))
-        val cx = b.l + 22f - hv * 1.5f
-        val cy = b.t + 22f
-        poly(mix(A(255, 170, 140, 225), WHITE, hv), 2.2f, false, cx + 3.5f, cy - 7f, cx - 3.5f, cy, cx + 3.5f, cy + 7f)
-        txt("ПОДПИСКА", L.header.l, L.header.t, L.header.w, L.header.h, 22f, WHITE)
+        drawCircle(A((40f * hv).toInt(), 190, 140, 255), 28f, Offset(b.l + 28f, b.t + 28f))
+        drawCircle(mix(A(255, 80, 58, 130), A(255, 190, 130, 255), hv), 28f, Offset(b.l + 28f, b.t + 28f), style = Stroke(1.4f))
+        val cx = b.l + 28f - hv * 1.5f
+        val cy = b.t + 28f
+        poly(mix(A(255, 170, 140, 225), WHITE, hv), 2.8f, false, cx + 4.5f, cy - 9f, cx - 4.5f, cy, cx + 4.5f, cy + 9f)
+        txt("ПОДПИСКА", L.header.l, L.header.t, L.header.w, L.header.h, 24f, WHITE)
     }
 
     reveal(a, 1, L.statusCard.l, L.statusCard.t, L.statusCard.w, L.statusCard.h) {
@@ -505,49 +543,211 @@ fun DrawScope.paintSub(a: AppState) {
                 1f + sel * 0.8f
             )
 
-            val rx = px + 14f
-            val ry = py + 14f
-            drawCircle(mix(A(255, 80, 62, 125), A(255, 195, 125, 255), sel), 7f, Offset(rx, ry), style = Stroke(1.4f))
+            val rx = px + 18f
+            val ry = py + 18f
+            drawCircle(mix(A(255, 80, 62, 125), A(255, 195, 125, 255), sel), 9f, Offset(rx, ry), style = Stroke(1.6f))
             if (sel > 0.02f) {
-                drawCircle(A((sel * 255f).toInt(), 150, 80, 235), 7f * sel, Offset(rx, ry))
-                iconCheck(rx, ry, A((sel * 255f).toInt(), 255, 255, 255), 1.5f)
+                drawCircle(A((sel * 255f).toInt(), 150, 80, 235), 9f * sel, Offset(rx, ry))
+                iconCheck(rx, ry, A((sel * 255f).toInt(), 255, 255, 255), 1.8f)
             }
 
             val pct = (100.0 - 100.0 * pl.price / (pl.months * BASE_PRICE.toDouble())).roundToInt()
             if (pct > 0) {
                 val gold = i == 2
                 val cc = if (gold) A(255, 235, 190, 255) else A(255, 150, 245, 190)
-                rr(px + pw - 40f, py + 8f, 32f, 15f, 7.5f, cc.copy(alpha = 0.16f))
-                rrS(px + pw - 40f, py + 8f, 32f, 15f, 7.5f, cc.copy(alpha = 0.55f))
-                txt("-$pct%", px + pw - 40f, py + 8f, 32f, 15f, 9f, cc)
+                rr(px + pw - 48f, py + 9f, 38f, 18f, 9f, cc.copy(alpha = 0.16f))
+                rrS(px + pw - 48f, py + 9f, 38f, 18f, 9f, cc.copy(alpha = 0.55f))
+                txt("-$pct%", px + pw - 48f, py + 9f, 38f, 18f, 10f, cc)
             }
 
             val unit = if (pl.months == 1) "МЕСЯЦ" else if (pl.months < 5) "МЕСЯЦА" else "МЕСЯЦЕВ"
-            txt(pl.months.toString(), px, py + 24f, pw, 32f, 26f, WHITE)
-            txt(unit, px, py + 56f, pw, 12f, 9f, A(255, 150, 120, 200))
-            txt(pl.price.toString() + " ₽", px, py + 74f, pw, 20f, 16f, mix(WHITE, A(255, 235, 190, 255), sel))
-            txt((pl.price.toDouble() / pl.months).roundToInt().toString() + " ₽/мес", px, py + 96f, pw, 12f, 9f, A(255, 130, 108, 175), 1, false)
+            txt(pl.months.toString(), px, py + 28f, pw, 34f, 30f, WHITE)
+            txt(unit, px, py + 62f, pw, 14f, 10f, A(255, 150, 120, 200))
+            txt(pl.price.toString() + " ₽", px, py + 82f, pw, 22f, 19f, mix(WHITE, A(255, 235, 190, 255), sel))
+            txt((pl.price.toDouble() / pl.months).roundToInt().toString() + " ₽/мес", px, py + 106f, pw, 14f, 11f, A(255, 130, 108, 175), 1, false)
         }
     }
 
     reveal(a, 6, L.buy.l, L.buy.t, L.buy.w, L.buy.h) {
         gradButton(
-            L.buy, 20f, a.hvOf(Hit.BUY), a.down == Hit.BUY && a.hit == Hit.BUY, true,
-            (if (prem) "ПРОДЛИТЬ" else "КУПИТЬ") + "  •  " + a.priceShown.roundToInt() + " ₽", 17f, t
+            L.buy, 26f, a.hvOf(Hit.BUY), a.down == Hit.BUY && a.hit == Hit.BUY, true,
+            (if (prem) "ПРОДЛИТЬ" else "КУПИТЬ") + "  •  " + a.priceShown.roundToInt() + " ₽", 20f, t
         )
     }
 
     reveal(a, 7, L.keyLabel.l, L.keyLabel.t, L.activate.r - L.keyLabel.l, L.keyMsg.b - L.keyLabel.t) {
-        txt("ИЛИ ВВЕДИТЕ КЛЮЧ АКТИВАЦИИ", L.keyLabel.l, L.keyLabel.t, L.keyLabel.w, L.keyLabel.h, 10f, A(255, 150, 120, 200), 0)
+        txt("ИЛИ ВВЕДИТЕ КЛЮЧ АКТИВАЦИИ", L.keyLabel.l, L.keyLabel.t, L.keyLabel.w, L.keyLabel.h, 11f, A(255, 150, 120, 200), 0)
         val kerr = a.keyMsgT > 0f && !a.keyMsgOk && a.keyShake > 0.01f
         fieldBox(L.keyField, a.focus[2], kerr, a.shakeX(2), 2, "XXXXX-XXXXX-XXXXX-XXXXX", a.inputKey.isEmpty())
         gradButton(
-            L.activate, 16f, a.hvOf(Hit.ACTIVATE), a.down == Hit.ACTIVATE && a.hit == Hit.ACTIVATE,
-            a.inputKey.isNotEmpty(), "АКТИВИРОВАТЬ", 15f, t
+            L.activate, 22f, a.hvOf(Hit.ACTIVATE), a.down == Hit.ACTIVATE && a.hit == Hit.ACTIVATE,
+            a.inputKey.isNotEmpty(), "АКТИВИРОВАТЬ", 18f, t
         )
         if (a.keyMsgT > 0f) {
             val mc = if (a.keyMsgOk) A(255, 130, 240, 170) else A(255, 255, 110, 130)
-            txt(a.keyMsg, L.keyMsg.l, L.keyMsg.t, L.keyMsg.w, L.keyMsg.h, 12f, withA(mc, a.keyMsgT))
+            txt(a.keyMsg, L.keyMsg.l, L.keyMsg.t, L.keyMsg.w, L.keyMsg.h, 13f, withA(mc, a.keyMsgT))
+        }
+    }
+}
+
+fun DrawScope.paintApps(a: AppState) {
+    val L = a.L
+    val m = 16f
+
+    reveal(a, 0, L.header.l, L.header.t, L.header.w, L.header.h) {
+        val b = L.back
+        val hv = a.hvOf(Hit.BACK)
+        drawCircle(A((40f * hv).toInt(), 190, 140, 255), 28f, Offset(b.l + 28f, b.t + 28f))
+        drawCircle(mix(A(255, 80, 58, 130), A(255, 190, 130, 255), hv), 28f, Offset(b.l + 28f, b.t + 28f), style = Stroke(1.4f))
+        val cx = b.l + 28f - hv * 1.5f
+        val cy = b.t + 28f
+        poly(mix(A(255, 170, 140, 225), WHITE, hv), 2.8f, false, cx + 4.5f, cy - 9f, cx - 4.5f, cy, cx + 4.5f, cy + 9f)
+        txt("ПРИЛОЖЕНИЯ", L.header.l, L.header.t, L.header.w, L.header.h, 24f, WHITE)
+    }
+
+    reveal(a, 1, L.appsMaster.l, L.appsMaster.t, L.appsMaster.w, L.appsMaster.h) {
+        val b = L.appsMaster
+        val on = a.splitEnabled
+        val hv = a.hvOf(Hit.APPS_MASTER)
+        glowRR(b.l, b.t, b.w, b.h, 20f, A(255, 180, 110, 255), if (on) 0.5f else hv * 0.4f)
+        card(
+            b.l, b.t, b.w, b.h, 20f,
+            mix(A(255, 20, 14, 36), A(255, 34, 22, 60), hv),
+            mix(A(255, 9, 7, 16), A(255, 18, 12, 32), hv),
+            if (on) A(255, 195, 125, 255) else mix(A(255, 52, 38, 84), A(255, 120, 90, 180), hv),
+            if (on) 1.6f else 1.2f
+        )
+        txt("Только выбранные приложения", b.l + 18f, b.t + 10f, b.w - 100f, 26f, 15f, WHITE, 0)
+        txt(
+            if (on) "VPN только для отмеченных" else "VPN для всех приложений",
+            b.l + 18f, b.t + 38f, b.w - 100f, 22f, 12f,
+            if (on) A(255, 235, 190, 255) else A(255, 130, 108, 175), 0, false
+        )
+        val tw = 56f
+        val th = 30f
+        val tx = b.r - tw - 16f
+        val ty = b.t + (b.h - th) / 2f
+        val prog = if (on) 1f else 0f
+        val bg = if (on) A(255, 150, 82, 244) else A(255, 40, 30, 60)
+        rrB(tx, ty, tw, th, th / 2f, dGrad(if (on) A(255, 190, 100, 255) else A(255, 40, 30, 60), bg, tx, ty, tw, th))
+        rrS(tx, ty, tw, th, th / 2f, if (on) A(255, 220, 150, 255) else A(255, 70, 54, 110), 1.2f)
+        val knobX = tx + th / 2f + (tw - th) * prog
+        drawCircle(WHITE, 12f, Offset(knobX, ty + th / 2f))
+        if (on) drawCircle(A(60, 255, 255, 255), 16f, Offset(knobX, ty + th / 2f))
+    }
+
+    if (!a.splitEnabled) {
+        return
+    }
+
+    val sb = L.appsSearch
+    reveal(a, 2, sb.l, sb.t, sb.w, sb.h) {
+        val f = a.focus[3]
+        val rad = 16f
+        rr(sb.l, sb.t, sb.w, sb.h, rad, mix(A(255, 17, 12, 30), A(255, 24, 16, 44), f))
+        rrS(sb.l, sb.t, sb.w, sb.h, rad, mix(A(255, 56, 42, 92), A(255, 150, 80, 235), f), 1.2f + 0.8f * f)
+        val icc = mix(A(255, 110, 88, 160), A(255, 190, 130, 255), f)
+        drawCircle(icc, 6f, Offset(sb.l + 26f, sb.t + sb.h / 2f - 2f), style = Stroke(1.6f))
+        line(icc, sb.l + 30f, sb.t + sb.h / 2f + 2f, sb.l + 34f, sb.t + sb.h / 2f + 6f, 1.6f)
+        if (a.searchQuery.isEmpty()) {
+            txt("Поиск приложения", sb.l + 50f, sb.t, sb.w - 60f, sb.h, 15f, A(255, 100, 80, 140), 0, false)
+        }
+        if (a.searchQuery.isNotEmpty()) {
+            val cx = sb.r - 24f
+            val cy = sb.t + sb.h / 2f
+            drawCircle(A(255, 60, 44, 100), 12f, Offset(cx, cy))
+            line(A(255, 200, 180, 235), cx - 4f, cy - 4f, cx + 4f, cy + 4f, 1.6f)
+            line(A(255, 200, 180, 235), cx + 4f, cy - 4f, cx - 4f, cy + 4f, 1.6f)
+        }
+    }
+
+    val top = L.appsListTop
+    val bottom = L.appsListBottom
+    val rowH = APPS_ROW_H
+    val list = a.filteredApps()
+    val maxRows = ((bottom - top) / rowH).toInt().coerceAtLeast(0)
+    val startIdx = (a.appsScroll / rowH).toInt().coerceIn(0, max(0, list.size - maxRows))
+    val frac = (a.appsScroll - startIdx * rowH) / rowH
+    val baseY = top - frac * rowH
+
+    if (a.appsLoading) {
+        txt("Загрузка приложений…", m, top, W - 2 * m, 60f, 15f, A(255, 130, 108, 175))
+        return
+    }
+    if (list.isEmpty()) {
+        txt(
+            if (a.searchQuery.isEmpty()) "Приложения не найдены" else "Ничего не найдено",
+            m, top, W - 2 * m, 60f, 15f, A(255, 130, 108, 175)
+        )
+        return
+    }
+
+    val rowW = W - 2 * m - 12f
+    clipPath(Path().apply { addRect(Rect(m, top, W - m, bottom)) }) {
+        for (i in startIdx until min(list.size, startIdx + maxRows + 2)) {
+            val app = list[i]
+            val y = baseY + (i - startIdx) * rowH
+            val enabled = app.pkg in a.splitSel
+
+            rr(m, y + 4f, rowW, rowH - 8f, 16f, if (enabled) A(255, 24, 16, 44) else A(255, 17, 12, 30))
+            rrS(m, y + 4f, rowW, rowH - 8f, 16f, if (enabled) A(255, 90, 66, 140) else A(255, 40, 30, 60))
+
+            val icon = app.icon
+            if (icon != null) {
+                val cx = m + 32f
+                val cy = y + rowH / 2f
+                val sz = 36f
+                clipPath(Path().apply { addRoundRect(RoundRect(cx - sz / 2, cy - sz / 2, cx + sz / 2, cy + sz / 2, 10f, 10f)) }) {
+                    withTransform({
+                        translate(cx - sz / 2, cy - sz / 2)
+                        scale(sz / icon.width, sz / icon.height, Offset.Zero)
+                    }) { drawImage(icon) }
+                }
+            } else {
+                drawCircle(A(255, 60, 44, 100), 18f, Offset(m + 32f, y + rowH / 2f))
+            }
+
+            txt(ell(app.label, 16f, rowW - 160f), m + 60f, y + 8f, rowW - 160f, 26f, 16f, WHITE, 0)
+            txt(ell(app.pkg, 11f, rowW - 160f), m + 60f, y + 34f, rowW - 160f, 18f, 11f, A(255, 130, 108, 175), 0, false)
+
+            val tw = 52f
+            val th = 28f
+            val tx = m + rowW - tw - 14f
+            val ty = y + (rowH - th) / 2f
+            val prog2 = if (enabled) 1f else 0f
+            val bg = if (enabled) A(255, 150, 82, 244) else A(255, 40, 30, 60)
+            rrB(tx, ty, tw, th, th / 2f, dGrad(if (enabled) A(255, 190, 100, 255) else A(255, 40, 30, 60), bg, tx, ty, tw, th))
+            rrS(tx, ty, tw, th, th / 2f, if (enabled) A(255, 220, 150, 255) else A(255, 70, 54, 110), 1.2f)
+            val knobX = tx + th / 2f + (tw - th) * prog2
+            drawCircle(WHITE, 11f, Offset(knobX, ty + th / 2f))
+            if (enabled) drawCircle(A(60, 255, 255, 255), 15f, Offset(knobX, ty + th / 2f))
+        }
+    }
+
+    if (list.size > maxRows) {
+        val bar = L.appsScrollBar
+        val total = list.size * rowH
+        val view = bottom - top
+        val thumbH = max(30f, view * view / total)
+        val maxScroll = (total - view).coerceAtLeast(1f)
+        val thumbY = top + (bar.h - thumbH) * (a.appsScroll / maxScroll)
+        rr(bar.l, bar.t, bar.w, bar.h, bar.w / 2f, A(60, 255, 255, 255))
+        rr(bar.l, thumbY, bar.w, thumbH, bar.w / 2f, A(180, 255, 200, 255))
+    }
+
+    if (a.reconnectHint) {
+        reveal(a, 3, L.appsApply.l, L.appsApply.t, L.appsApply.w, L.appsApply.h) {
+            val b = L.appsApply
+            val hv = a.hvOf(Hit.APPLY_SPLIT)
+            val pr = if (a.down == Hit.APPLY_SPLIT && a.hit == Hit.APPLY_SPLIT) 1f else 0f
+            val x = b.l + pr * 2f
+            val y = b.t + pr * 1.5f
+            val w = b.w - pr * 4f
+            val h = b.h - pr * 3f
+            glowRR(x, y, w, h, 22f, A(255, 190, 100, 255), hv)
+            rrB(x, y, w, h, 22f, dGrad(mix(A(255, 118, 52, 214), A(255, 150, 82, 244), hv), mix(A(255, 172, 80, 248), A(255, 214, 118, 255), hv), x, y, w, h))
+            rrS(x, y, w, h, 22f, A(70, 255, 255, 255))
+            txt("ПРИМЕНИТЬ И ПЕРЕПОДКЛЮЧИТЬ", x, y, w, h, 16f, WHITE)
         }
     }
 }
