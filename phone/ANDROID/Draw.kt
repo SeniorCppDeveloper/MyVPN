@@ -23,6 +23,7 @@ import androidx.compose.ui.graphics.toArgb
 const val W = 520f
 const val H = 720f
 const val TITLE_H = 44f
+const val FIELD_PAD = 56f
 
 val WHITE = Color(255, 255, 255, 255)
 
@@ -170,6 +171,23 @@ fun DrawScope.iconKey(cx: Float, cy: Float, c: Color) {
     line(c, cx, cy, cx + 8f, cy, 1.7f)
     line(c, cx + 5f, cy, cx + 5f, cy + 3f, 1.7f)
     line(c, cx + 8f, cy, cx + 8f, cy + 3f, 1.7f)
+}
+
+fun DrawScope.iconApps(cx: Float, cy: Float, c: Color) {
+    rrS(cx - 9f, cy - 9f, 7f, 7f, 2f, c, 1.7f)
+    rrS(cx + 2f, cy - 9f, 7f, 7f, 2f, c, 1.7f)
+    rrS(cx - 9f, cy + 2f, 7f, 7f, 2f, c, 1.7f)
+    rrS(cx + 2f, cy + 2f, 7f, 7f, 2f, c, 1.7f)
+}
+
+fun DrawScope.iconChevron(cx: Float, cy: Float, c: Color) =
+    poly(c, 2.4f, false, cx - 3f, cy - 7f, cx + 4f, cy, cx - 3f, cy + 7f)
+
+fun DrawScope.scaled(cx: Float, cy: Float, k: Float, block: DrawScope.() -> Unit) {
+    withTransform({
+        translate(cx, cy)
+        scale(k, k, Offset.Zero)
+    }) { block() }
 }
 
 fun DrawScope.drawLogo(x: Float, y: Float, sz: Float) {
