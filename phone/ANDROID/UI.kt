@@ -4,6 +4,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -41,6 +42,7 @@ import androidx.compose.ui.text.input.TransformedText
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.IntOffset
+import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 
@@ -143,7 +145,10 @@ fun NullVpnApp(a: AppState) {
         }
     }
 
-    BackHandler(enabled = a.screen == Screen.SUB) { a.goTo(Screen.MAIN) }
+    BackHandler(enabled = a.screen == Screen.SUB || a.screen == Screen.APPS) {
+        a.goTo(Screen.MAIN)
+        a.appsScroll = 0f
+    }
 
     Box(
         modifier = Modifier
@@ -151,7 +156,36 @@ fun NullVpnApp(a: AppState) {
             .background(Color(2, 1, 6))
             .onSizeChanged { a.setSize(it.width.toFloat(), it.height.toFloat()) }
             .pointerInput(Unit) {
+                detectVerticalDragGestures(
+                    onVerticalDrag = { change, dragAmount ->
+                        if (a.screen == Screen.APPS && a.splitEnabled) {
+                            change.consume()
+                            a.appsScroll = (a.appsScroll - dragAmount / a.s)
+                                .coerceIn(0f, max(0f, a.maxScroll()))
+                        }
+                    }
+                )
+            }
+            .pointerInput(Unit) {
                 detectTapGestures(onPress = { pos ->
+                    val px = (pos.x - a.ox) / a.s
+                    val py = (pos.y - a.oy) / a.s
+                    if (a.screen == Screen.APPS && a.splitEnabled && a.L.appsScrollBar.has(px, py)) {
+                        val list = a.filteredApps()
+                        val maxRows = ((a.L.appsListBottom - a.L.appsListTop) / APPS_ROW_H).toInt()
+                        val total = list.size * APPS_ROW_H
+                        val view = a.L.appsListBottom - a.L.appsListTop
+                        val thumbH = max(30f, view * view / total)
+                        val barH = a.L.appsScrollBar.h
+                        val maxScroll = (total - view).coerceAtLeast(1f)
+                        val rel = (py - a.L.appsListTop - thumbH / 2f).coerceIn(0f, barH - thumbH) / (barH - thumbH)
+                        a.appsScroll = rel * maxScroll
+                        change@ while (true) {
+                            val ok = tryAwaitRelease()
+                            if (!ok) break
+                            return@detectTapGestures
+                        }
+                    }
                     focusManager.clearFocus()
                     val h = a.hitTest(pos)
                     a.hit = h
@@ -202,6 +236,18 @@ fun NullVpnApp(a: AppState) {
                     KeyboardActions(onDone = { a.redeemKey() }),
                     KeyVT()
                 ) { a.fKey = it }
+            }
+        }
+
+        if (a.screen == Screen.APPS && a.splitEnabled) {
+            Overlay(a, { a.L.appsSearch }, 2, 3) {
+                InputField(
+                    a, a.searchQuery,
+                    { a.searchQuery = it; a.appsScroll = 0f },
+                    KeyboardOptions(imeAction = ImeAction.Search),
+                    KeyboardActions(onSearch = { focusManager.clearFocus() }),
+                    VisualTransformation.None
+                ) { a.searchFocus = it }
             }
         }
     }
